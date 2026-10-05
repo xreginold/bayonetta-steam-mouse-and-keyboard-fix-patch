@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            shell: powershell   # Windows PowerShell 5.1, what end users run
+          - os: windows-latest
+            shell: pwsh
+          - os: ubuntu-latest
+            shell: pwsh
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        shell: pwsh
+        env:
+          TEST_SHELL: ${{ matrix.shell }}
+        run: ./tests/Run-Tests.ps1
+
+  package:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release zip
+        run: |
+          mkdir -p dist/Bayonetta-KBM-Fix/tools
+          cp "Fix Bayonetta Keyboard and Mouse.bat" "Restore Backup.bat" \
+             "Play Bayonetta (No Mouse Accel).bat" README.md dist/Bayonetta-KBM-Fix/
+          cp tools/BayonettaKBMFix.ps1 dist/Bayonetta-KBM-Fix/tools/
+          cd dist && zip -r Bayonetta-KBM-Fix.zip Bayonetta-KBM-Fix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bayonetta-KBM-Fix
+          path: dist/Bayonetta-KBM-Fix/
+      - name: Attach to GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Bayonetta-KBM-Fix.zip
+    permissions:
+      contents: write
